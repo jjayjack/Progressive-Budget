@@ -1,5 +1,6 @@
 let transactions = [];
 let myChart;
+let storeName = "transactions";
 
 fetch("/api/transaction")
   .then(response => {
@@ -76,6 +77,39 @@ function populateChart() {
         }]
     }
   });
+}
+
+function saveRecord(){
+  const request = window.indexedDB.open('budget', 1);
+  let db, tx, store;
+  request.onupgradeneeded = function(e) {
+    const db = request.result;
+    db.createObjectStore(storeName, {keyPath: "id"})
+  };
+  request.onerror = function(e){
+    console.log("Error Occurred")
+  };
+  request.onsuccess = function(e){
+    db = request.result;
+    tx = db.transaction(storeName, "readwrite");
+    store = tx.objectStore(storeName);
+
+    db.onerror = function(e){
+      console.log("error occurred during success");
+    }
+    if (request.method === "put") {
+      store.put(object);
+    }
+    if (request.method === "get") {
+      const all = store.getAll();
+      all.onsuccess = function(){
+        resolve(all.result);
+      }
+    }
+    tx.oncomplete = function(){
+      db.close();
+    }
+  }
 }
 
 function sendTransaction(isAdding) {
