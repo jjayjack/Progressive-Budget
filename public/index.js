@@ -67,49 +67,16 @@ function populateChart() {
 
   myChart = new Chart(ctx, {
     type: 'line',
-      data: {
-        labels,
-        datasets: [{
-            label: "Total Over Time",
-            fill: true,
-            backgroundColor: "#6666ff",
-            data
-        }]
+    data: {
+      labels,
+      datasets: [{
+        label: "Total Over Time",
+        fill: true,
+        backgroundColor: "#6666ff",
+        data
+      }]
     }
   });
-}
-
-function saveRecord(){
-  const request = window.indexedDB.open('budget', 1);
-  let db, tx, store;
-  request.onupgradeneeded = function(e) {
-    const db = request.result;
-    db.createObjectStore(storeName, {keyPath: "id"})
-  };
-  request.onerror = function(e){
-    console.log("Error Occurred")
-  };
-  request.onsuccess = function(e){
-    db = request.result;
-    tx = db.transaction(storeName, "readwrite");
-    store = tx.objectStore(storeName);
-
-    db.onerror = function(e){
-      console.log("error occurred during success");
-    }
-    if (request.method === "put") {
-      store.put(object);
-    }
-    if (request.method === "get") {
-      const all = store.getAll();
-      all.onsuccess = function(){
-        resolve(all.result);
-      }
-    }
-    tx.oncomplete = function(){
-      db.close();
-    }
-  }
 }
 
 function sendTransaction(isAdding) {
@@ -145,7 +112,7 @@ function sendTransaction(isAdding) {
   populateChart();
   populateTable();
   populateTotal();
-  
+
   // also send to server
   fetch("/api/transaction", {
     method: "POST",
@@ -155,33 +122,110 @@ function sendTransaction(isAdding) {
       "Content-Type": "application/json"
     }
   })
-  .then(response => {    
-    return response.json();
-  })
-  .then(data => {
-    if (data.errors) {
-      errorEl.textContent = "Missing Information";
-    }
-    else {
+    .then(response => {
+      return response.json();
+    })
+    .then(data => {
+      if (data.errors) {
+        errorEl.textContent = "Missing Information";
+      }
+      else {
+        // clear form
+        nameEl.value = "";
+        amountEl.value = "";
+      }
+    })
+    .catch(err => {
+      // fetch failed, so save in indexed db
+      console.log("offline")
+      saveRecord(transaction);
+
       // clear form
       nameEl.value = "";
       amountEl.value = "";
-    }
-  })
-  .catch(err => {
-    // fetch failed, so save in indexed db
-    saveRecord(transaction);
-
-    // clear form
-    nameEl.value = "";
-    amountEl.value = "";
-  });
+    });
 }
 
-document.querySelector("#add-btn").onclick = function() {
+function saveRecord() {
+  const indexedDB = window.indexedDB;
+  if (!indexedDB) {
+    console.log("Your browser does not support a version of IndexedDB")
+  };
+  const request = indexedDB.open("budget", 2)
+
+  request.onerror = function (event) {
+    console.log(error)
+  }
+
+  request.onupgradeneeded = function (event) {
+    db = event.target.result;
+    const objectStore = db.createObjectStore(storeName, { keyPath: "_id" })
+
+    objectStore.createIndex("purchase", "purchase", { unique: false });
+    objectStore.transaction.oncomplete = function (event) {
+      
+      const purchases = db.transaction(storeName, "readwrite").objectStore(storeName);
+      transactions.forEach(function (purchase) {
+        purchases.add(purchase);
+      })
+    }
+  }
+
+  request.onsuccess = function (event) {
+    db = request.result
+    let trans = indexedDB.open("budget");
+    trans.onerror = function (event) {
+      console.log("unable to process request")
+    };
+    trans.onsuccess = function (event) {
+      db = event.target.result;
+    }
+  }
+}
+//   const request = window.indexedDB.open(databaseName, 1);
+//     let db,
+//       tx,
+//       store;
+
+//     request.onupgradeneeded = function(e) {
+//       const db = request.result;
+//       db.createObjectStore(storeName, { keyPath: "_id" });
+//     };
+
+//     request.onerror = function(e) {
+//       console.log("There was an error");
+//     };
+
+//     request.onsuccess = function(e) {
+//       db = request.result;
+//       tx = db.transaction(storeName, "readwrite");
+//       store = tx.objectStore(storeName);
+
+//       db.onerror = function(e) {
+//         console.log("error");
+//       };
+//       if (method === "put") {
+//         store.put(object);
+//       }
+//       if (method === "clear") {
+//         store.clear();
+//       }
+//       if (method === "get") {
+//         const all = store.getAll();
+//         all.onsuccess = function() {
+//           resolve(all.result);
+//         };
+//       }
+//       tx.oncomplete = function() {
+//         db.close();
+//       };
+//     };
+// }
+
+document.querySelector("#add-btn").onclick = function () {
   sendTransaction(true);
 };
 
-document.querySelector("#sub-btn").onclick = function() {
+document.querySelector("#sub-btn").onclick = function () {
   sendTransaction(false);
 };

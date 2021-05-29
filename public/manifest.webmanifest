@@ -1,9 +1,6 @@
 {
     "name": "Progressive Web App Expenses",
     "short_name": "Expenses PWA",
-    "start_url": "/index.html",
-    "display": "standalone",
-    "orientation": "portrait",
     "icons": [
         {
             "src": "./icons/icon-192x192.png",
@@ -15,5 +12,10 @@
             "size": "512x512",
             "type": "image/png"
         }
-    ]
+    ],
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "theme_color": "#6666FF",
+    "background_color": "#6666FF"
 }
