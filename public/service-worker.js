@@ -14,40 +14,54 @@ const CACHE_NAME = 'static-cache-v1';
 const DATA_CACHE_NAME = 'data-cache-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-      caches.open(DATA_CACHE_NAME).then((cache) => cache.add("/api/transaction"))
-  )
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(FILES_TO_CACHE))
-      .then(self.skipWaiting())
-  );
+    event.waitUntil(
+        caches.open(DATA_CACHE_NAME).then((cache) => cache.add("/api/transaction"))
+    )
+    event.waitUntil(
+        caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.addAll(FILES_TO_CACHE))
+            .then(self.skipWaiting())
+    );
 });
 
 self.addEventListener("fetch", (event) => {
-    event.respondWith(
-        caches.match(event.request).then(response => {
-            if (response) {
-                return response;
-            } else {
+    if (
+        event.request.method !== "GET" ||
+        !event.request.url.startsWith(self.location.origin)
+    ) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+    if (event.request.url.includes("/api/transaction")) {
+        // make network request and fallback to cache if network request fails (offline)
+        event.respondWith(
+            caches.open(DATA_CACHE_NAME).then(cache => {
                 return fetch(event.request)
-                    .then(res => {
-                        return caches.open(DATA_CACHE_NAME)
-                            .then(cache => {
-                                cache.put(event.request.url, res.clone());
-                                return res;
-                            })
+                    .then(response => {
+                        cache.put(event.request, response.clone());
+                        return response;
                     })
-                    .catch(err => {
-                        return cache.match(event.request);
-                    })
-            .catch(err => console.log(err));
-                }
-            })           
-    )
-})
-
+                    .catch(() => caches.match(event.request));
+            })
+        );
+        return;
+    }
+    event.respondWith(
+        caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            return caches.open(DATA_CACHE_NAME).then(cache => {
+                return fetch(event.request).then(response => {
+                    return cache.put(event.request, response.clone()).then(() => {
+                        return response;
+                    });
+                });
+            });
+        })
+    );
+});
 
 // The activate handler takes care of cleaning up old caches.
 self.addEventListener('activate', (event) => {
